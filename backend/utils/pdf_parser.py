@@ -12,14 +12,17 @@ logger = logging.getLogger(__name__)
 class PDFParser:
     """Utility class for parsing financial data from PDF reports."""
     
-    def __init__(self, pdf_directory):
+    def __init__(self, pdf_directory, flavor='lattice'):
         """
         Initialize the PDF parser.
         
         Args:
             pdf_directory (str): Directory containing PDF files
+            flavor (str, optional): The table extraction method to use ('lattice' or 'stream'). 
+                                   Use 'stream' to avoid Ghostscript dependency. Defaults to 'lattice'.
         """
         self.pdf_directory = pdf_directory
+        self.flavor = flavor
         
     def list_pdf_files(self):
         """
@@ -50,8 +53,20 @@ class PDFParser:
             list: List of pandas DataFrames containing table data
         """
         try:
-            tables = camelot.read_pdf(pdf_path, pages=pages)
-            return [table.df for table in tables]
+            # Use the specified flavor for extraction
+            tables = camelot.read_pdf(pdf_path, pages=pages, flavor=self.flavor)
+            
+            # If no tables found or tables are empty, try with different settings but same flavor
+            if len(tables) == 0 or all(len(table.df) == 0 for table in tables):
+                if self.flavor == 'lattice':
+                    # For lattice, try adjusting line_scale
+                    tables = camelot.read_pdf(pdf_path, pages=pages, flavor=self.flavor, line_scale=40)
+                else:
+                    # For stream, try adjusting edge_tol
+                    tables = camelot.read_pdf(pdf_path, pages=pages, flavor=self.flavor, edge_tol=500)
+            
+            # Filter out empty tables
+            return [table.df for table in tables if len(table.df) > 0]
         except Exception as e:
             logger.error(f"Error extracting tables from {pdf_path}: {e}")
             return []
@@ -69,7 +84,12 @@ class PDFParser:
             str: Extracted text
         """
         try:
-            return extract_text(pdf_path, page_numbers=range(start_page-1, end_page or float('inf')))
+            if end_page is None:
+                # Extract all pages
+                return extract_text(pdf_path, page_numbers=None)
+            else:
+                # Extract specified page range
+                return extract_text(pdf_path, page_numbers=range(start_page-1, end_page))
         except Exception as e:
             logger.error(f"Error extracting text from {pdf_path}: {e}")
             return ""

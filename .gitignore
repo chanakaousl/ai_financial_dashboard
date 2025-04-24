@@ -53,6 +53,7 @@ yarn-error.log*
 *.db
 *.sqlite
 *.sqlite3
+backend/*.db
 
 # Editor/IDE specific files
 .idea/

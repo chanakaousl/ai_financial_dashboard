@@ -68,10 +68,28 @@ Backend API for the John Keells Holdings Financial Dashboard application.
 1. Start the Flask development server:
 
    ```
-   python app.py
+   python run.py
    ```
 
 2. The API will be available at http://localhost:5000
+
+### Processing PDF Data
+
+To extract data from the financial reports (PDF files) and populate the database:
+
+1. Make sure your PDF files are in the `data-pdf` directory
+2. Run the data extraction script:
+   ```
+   python -m backend.scripts.extract_pdf_data
+   ```
+
+Alternatively, you can use the CLI interface:
+
+```
+python -m backend.cli process-pdfs
+```
+
+This will extract financial metrics from the PDFs and store them in the database.
 
 ## Project Structure
 

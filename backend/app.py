@@ -1,34 +1,42 @@
-from flask import Flask, jsonify
+from flask import Flask
 from dotenv import load_dotenv
 import os
+from .database import db
+from .api import api_bp
 
 # Load environment variables
 load_dotenv()
 
-app = Flask(__name__)
+def create_app(config_name='development'):
+    """
+    Create and configure the Flask application.
+    
+    Args:
+        config_name: Configuration environment name
+        
+    Returns:
+        Flask application instance
+    """
+    app = Flask(__name__)
+    
+    # Load configuration
+    if config_name == 'production':
+        app.config.from_object('backend.config.ProductionConfig')
+    elif config_name == 'testing':
+        app.config.from_object('backend.config.TestingConfig')
+    else:
+        app.config.from_object('backend.config.DevelopmentConfig')
+    
+    # Initialize database
+    db.init_db()
+    
+    # Register blueprints
+    app.register_blueprint(api_bp)
+    
+    return app
 
-@app.route('/api/health', methods=['GET'])
-def health_check():
-    """Health check endpoint to verify the API is running."""
-    return jsonify({
-        'status': 'success',
-        'message': 'API is running'
-    })
-
-@app.route('/api/reports', methods=['GET'])
-def get_reports():
-    """Endpoint to retrieve a list of available financial reports."""
-    return jsonify({
-        'status': 'success',
-        'data': [
-            {'id': '2019', 'name': 'Annual Report 2019'},
-            {'id': '2020', 'name': 'Annual Report 2020'},
-            {'id': '2021', 'name': 'Annual Report 2021'},
-            {'id': '2022', 'name': 'Annual Report 2022'},
-            {'id': '2023', 'name': 'Annual Report 2023'},
-            {'id': '2024', 'name': 'Annual Report 2024'}
-        ]
-    })
+# Create the Flask application
+app = create_app(os.environ.get('FLASK_ENV', 'development'))
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
