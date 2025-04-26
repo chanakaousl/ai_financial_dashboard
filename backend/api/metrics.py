@@ -37,6 +37,75 @@ def get_metrics():
     finally:
         db.close_session(session)
 
+
+# Assuming Metric ID 8 is for Top 20 Shareholders
+SHAREHOLDERS_METRIC_ID = 8
+
+@api_bp.route('/shareholders', methods=['GET'])
+def get_shareholders_data():
+    """
+    Get Top 20 Shareholders data over the years.
+    Attempts to parse the raw data if possible.
+
+    Returns:
+        JSON response with yearly shareholder data.
+    """
+    session = db.get_session()
+    try:
+        metric = session.query(FinancialMetric).filter(FinancialMetric.id == SHAREHOLDERS_METRIC_ID).first()
+
+        if not metric:
+            return jsonify({
+                'status': 'error',
+                'message': f'Shareholders metric (ID {SHAREHOLDERS_METRIC_ID}) not found'
+            }), 404
+
+        yearly_shareholder_data = []
+        for data_point in metric.data_points:
+            raw_value = data_point.value
+            parsed_data = None
+            parse_error = None
+
+            # Basic parsing attempt (example: assuming newline-separated list)
+            # This might need significant adjustment based on the actual data format
+            if isinstance(raw_value, str):
+                try:
+                    # Simple split by newline, remove empty lines
+                    lines = [line.strip() for line in raw_value.split('\n') if line.strip()]
+                    # Further parsing could be added here if structure is known (e.g., regex for name/percentage)
+                    parsed_data = lines # Keep it simple for now
+                except Exception as parse_e:
+                    parse_error = f"Could not parse shareholder data: {str(parse_e)}"
+
+
+            yearly_shareholder_data.append({
+                'year': data_point.report.year,
+                'raw_value': raw_value,
+                'parsed_data': parsed_data,
+                'parse_error': parse_error,
+                'notes': data_point.notes
+            })
+
+        # Sort by year
+        yearly_shareholder_data.sort(key=lambda x: x['year'])
+
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'metric_name': metric.name,
+                'metric_id': metric.id,
+                'yearly_data': yearly_shareholder_data
+            }
+        })
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+    finally:
+        db.close_session(session)
+
 @api_bp.route('/metrics/<int:metric_id>', methods=['GET'])
 def get_metric(metric_id):
     """
@@ -112,4 +181,4 @@ def get_metric_categories():
             'message': str(e)
         }), 500
     finally:
-        db.close_session(session) 
+        db.close_session(session)

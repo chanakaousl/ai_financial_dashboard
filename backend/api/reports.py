@@ -3,7 +3,6 @@ API endpoints for financial reports.
 """
 from flask import jsonify, request
 from . import api_bp
-from ..utils.pdf_parser import PDFParser
 from ..database import db
 from ..models.financial_data import FinancialReport
 
@@ -92,4 +91,4 @@ def get_report(report_id):
             'message': str(e)
         }), 500
     finally:
-        db.close_session(session) 
+        db.close_session(session)
