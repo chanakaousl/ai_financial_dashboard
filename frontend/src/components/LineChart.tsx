@@ -10,6 +10,7 @@ import {
   Legend,
   ChartOptions,
 } from 'chart.js';
+import { useEffect, useState } from 'react';
 
 // Register Chart.js components
 ChartJS.register(
@@ -43,22 +44,55 @@ const LineChart = ({
   yAxisLabel, 
   tooltipCallback 
 }: LineChartProps) => {
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Check if dark mode is active
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDarkMode(document.documentElement.classList.contains('dark'));
+    };
+    
+    // Initial check
+    checkDarkMode();
+    
+    // Watch for theme changes
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { 
+      attributes: true, 
+      attributeFilter: ['class'] 
+    });
+    
+    return () => observer.disconnect();
+  }, []);
+
   const options: ChartOptions<'line'> = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
         position: 'top',
+        labels: {
+          color: isDarkMode ? '#f3f4f6' : '#374151', // Text color for legend
+          font: {
+            weight: 'bold'
+          }
+        }
       },
       title: {
         display: true,
         text: title,
+        color: isDarkMode ? '#ffffff' : '#111827', // Title text color
         font: {
           size: 16,
           weight: 'bold',
         },
       },
       tooltip: {
+        backgroundColor: isDarkMode ? '#374151' : '#ffffff',
+        titleColor: isDarkMode ? '#ffffff' : '#111827',
+        bodyColor: isDarkMode ? '#f3f4f6' : '#4b5563',
+        borderColor: isDarkMode ? '#4b5563' : '#e5e7eb',
+        borderWidth: 1,
         callbacks: {
           label: function(context) {
             let label = context.dataset.label || '';
@@ -79,13 +113,26 @@ const LineChart = ({
         title: {
           display: !!yAxisLabel,
           text: yAxisLabel,
+          color: isDarkMode ? '#f3f4f6' : '#4b5563', // Y-axis title color
         },
         ticks: {
+          color: isDarkMode ? '#d1d5db' : '#6b7280', // Y-axis tick color
           callback: function(value) {
             return tooltipCallback ? tooltipCallback(value as number) : value;
           }
+        },
+        grid: {
+          color: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)', // Grid line color
         }
       },
+      x: {
+        ticks: {
+          color: isDarkMode ? '#d1d5db' : '#6b7280', // X-axis tick color
+        },
+        grid: {
+          color: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)', // Grid line color
+        }
+      }
     },
   };
 

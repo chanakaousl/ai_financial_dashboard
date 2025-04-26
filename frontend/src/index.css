@@ -2,16 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom styles can go below this line */
+/* Custom styles for the financial dashboard */
 
+/**
+ * Base theme styles - light and dark mode transitions
+ */
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  /* Light mode colors */
+  color-scheme: light;
+  --background-primary: #f9fafb;
+  --background-secondary: #ffffff;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -19,60 +25,121 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
+/* Dark mode overrides */
+.dark {
+  color-scheme: dark;
+  --background-primary: #111827;
+  --background-secondary: #1f2937;
+  --text-primary: #f9fafb;
+  --text-secondary: #d1d5db;
 }
 
-a:hover {
-  color: #535bf2;
+/* Apply smooth transitions for theme switching */
+* {
+  transition-property: color, background-color, border-color, box-shadow;
+  transition-duration: 200ms;
+  transition-timing-function: ease-out;
 }
 
+/* Base app styling */
 body {
   margin: 0;
   display: block;
   min-width: 100%;
   min-height: 100vh;
+  background-color: var(--background-primary);
+  color: var(--text-primary);
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+/* Ensure text is visible in dark mode */
+.dark h1,
+.dark h2,
+.dark h3,
+.dark h4,
+.dark h5,
+.dark h6 {
+  color: #ffffff;
+}
+
+.dark p,
+.dark span,
+.dark div {
+  color: #f3f4f6;
+}
+
+/* Specific fixes for financial values in cards */
+.dark .text-6xl,
+.dark .text-5xl,
+.dark .text-4xl,
+.dark .text-3xl {
+  color: #ffffff;
+  text-shadow: 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.dark .value-change-positive {
+  color: #34d399 !important;
+  /* Brighter green for dark mode */
+}
+
+.dark .value-change-negative {
+  color: #f87171 !important;
+  /* Brighter red for dark mode */
+}
+
+/* Reset link and button styling */
+a {
+  font-weight: 500;
+  text-decoration: inherit;
 }
 
 button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
 }
 
-button:hover {
-  border-color: #646cff;
+/* Animation for value changes */
+.value-change-positive {
+  @apply text-finance-green;
 }
 
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+.value-change-negative {
+  @apply text-finance-red;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+.fade-in {
+  animation: fadeIn 300ms ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
   }
 
-  a:hover {
-    color: #747bff;
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
+}
 
-  button {
-    background-color: #f9f9f9;
-  }
+/* Custom scrollbar for better UX */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100 dark:bg-gray-800;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 dark:bg-gray-600 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400 dark:bg-gray-500;
+}
+
+/* Focus styles for accessibility */
+:focus-visible {
+  @apply outline-none ring-2 ring-primary-500;
 }
