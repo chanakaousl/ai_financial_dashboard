@@ -4,7 +4,7 @@ Command-line interface for the JKH Financial Dashboard application.
 import click
 import logging
 from .database import db
-from .utils.pdf_extractor import PDFExtractor
+from .scripts.financial_data_extractor import FinancialDataExtractor
 from .config import get_config
 
 # Configure logger
@@ -33,18 +33,18 @@ def process_pdfs():
         # Initialize the database
         db.init_db()
         
-        # Create PDF extractor
-        extractor = PDFExtractor(pdf_directory)
+        # Create financial data extractor
+        extractor = FinancialDataExtractor(pdf_directory)
         
         # Process all reports
-        logger.info("Starting PDF data extraction...")
+        logger.info("Starting financial data extraction...")
         results = extractor.process_all_reports()
         
         # Log results
-        logger.info(f"PDF extraction completed. Results: {results}")
+        logger.info(f"Extraction completed. Results: {results}")
         
     except Exception as e:
-        logger.error(f"Error in PDF extraction: {e}")
+        logger.error(f"Error in financial data extraction: {e}")
         raise click.ClickException(str(e))
 
 if __name__ == '__main__':

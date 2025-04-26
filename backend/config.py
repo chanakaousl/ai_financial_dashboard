@@ -15,7 +15,7 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # PDF file directory
-    PDF_DIRECTORY = os.environ.get('PDF_DIRECTORY', '../data-pdf')
+    PDF_DIRECTORY = os.environ.get('PDF_DIRECTORY', os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data-pdf'))
 
 class DevelopmentConfig(Config):
     """Development configuration."""

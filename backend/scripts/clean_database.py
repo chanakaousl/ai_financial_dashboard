@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 """
-Script to clean the financial database by deleting all data from tables.
+Clean Database Script
 
-Usage:
-    python clean_database.py
+This script cleans all data from the database to allow for fresh data extraction.
 """
 import os
 import sys
@@ -16,15 +15,8 @@ from backend.database import db
 from backend.models.financial_data import FinancialReport, FinancialMetric, YearlyData
 
 def clean_database():
-    """
-    Delete all data from the database tables while keeping the schema intact.
-    """
-    print("Starting database cleanup...")
-    
-    # Initialize the database 
-    db.init_db()
-    
-    # Create session
+    """Delete all existing data from the database."""
+    print("Cleaning database...")
     session = db.get_session()
     
     try:
@@ -32,13 +24,13 @@ def clean_database():
         yearly_data_count = session.query(YearlyData).delete()
         print(f"Deleted {yearly_data_count} entries from YearlyData table")
         
-        # Delete all financial metrics
-        metrics_count = session.query(FinancialMetric).delete()
-        print(f"Deleted {metrics_count} entries from FinancialMetric table")
-        
         # Delete all financial reports
         reports_count = session.query(FinancialReport).delete()
         print(f"Deleted {reports_count} entries from FinancialReport table")
+        
+        # Delete all financial metrics
+        metrics_count = session.query(FinancialMetric).delete()
+        print(f"Deleted {metrics_count} entries from FinancialMetric table")
         
         # Commit the changes
         session.commit()
@@ -47,11 +39,12 @@ def clean_database():
     except Exception as e:
         session.rollback()
         print(f"Error during database cleanup: {e}")
-        return 1
     finally:
         db.close_session(session)
-    
-    return 0
 
 if __name__ == "__main__":
-    sys.exit(clean_database()) 
+    # Initialize the database
+    db.init_db()
+    
+    # Clean the database
+    clean_database() 
