@@ -9,9 +9,9 @@ from flask import Blueprint
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
 # Import all routes
-from .reports import *
-from .metrics import *
-from .analysis import *
+from api.reports import *
+from api.metrics import *
+from api.analysis import *
 
 # Register routes with the blueprint
 # Note: The imports above automatically register routes to the blueprint 

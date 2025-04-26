@@ -1,8 +1,8 @@
 from flask import Flask
 from dotenv import load_dotenv
 import os
-from .database import db
-from .api import api_bp
+from database import db
+from api import api_bp
 
 # Load environment variables
 load_dotenv()
@@ -21,11 +21,11 @@ def create_app(config_name='development'):
     
     # Load configuration
     if config_name == 'production':
-        app.config.from_object('backend.config.ProductionConfig')
+        app.config.from_object('config.ProductionConfig')
     elif config_name == 'testing':
-        app.config.from_object('backend.config.TestingConfig')
+        app.config.from_object('config.TestingConfig')
     else:
-        app.config.from_object('backend.config.DevelopmentConfig')
+        app.config.from_object('config.DevelopmentConfig')
     
     # Initialize database
     db.init_db()

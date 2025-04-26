@@ -2,9 +2,9 @@
 API endpoints for financial metrics.
 """
 from flask import jsonify, request
-from . import api_bp
-from ..database import db
-from ..models.financial_data import FinancialMetric, YearlyData
+from api import api_bp
+from database import db
+from models.financial_data import FinancialMetric, YearlyData
 
 @api_bp.route('/metrics', methods=['GET'])
 def get_metrics():

@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from backend.config import get_config
 from backend.database import db
-from backend.models.financial_data import FinancialReport, FinancialMetric, YearlyData
+from backend.models.financial_data import FinancialReport, FinancialMetric, YearlyData, ShareholderData
 
 # Configure logger
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -169,7 +169,11 @@ class FinancialDataExtractor:
         session = db.get_session()
         
         try:
-            # Delete all yearly data entries first (due to foreign key constraints)
+            # Delete all shareholder data entries first (due to foreign key constraints)
+            shareholder_data_count = session.query(ShareholderData).delete()
+            logger.info(f"Deleted {shareholder_data_count} entries from ShareholderData table")
+
+            # Delete all yearly data entries
             yearly_data_count = session.query(YearlyData).delete()
             logger.info(f"Deleted {yearly_data_count} entries from YearlyData table")
             
@@ -340,9 +344,11 @@ class FinancialDataExtractor:
                 search_pages.extend(important_ranges['financial_statements'])
                 search_pages.extend(important_ranges['financial_review'])
             elif metric_name == "right_issues":
+                # Search financial statements, equity statement, and potentially notes sections
                 if 'equity_statement' in key_pages:
                     search_pages.append(key_pages['equity_statement'])
                 search_pages.extend(important_ranges['financial_statements'])
+                search_pages.extend(range(200, 250)) # Add typical notes pages
             elif metric_name == "top_20_shareholders":
                 if 'shareholder_info' in key_pages:
                     search_pages.append(key_pages['shareholder_info'])
@@ -369,9 +375,19 @@ class FinancialDataExtractor:
                     logger.warning("Specialized extraction failed for net_asset_per_share. Trying generic approach...")
                     # Try with a simpler approach
                     value = self._extract_net_asset_simple(pdf_path, search_pages)
-            # Special handling for top 20 shareholders which needs table extraction
+            # Special handling for top 20 shareholders which needs table extraction and saving to separate table
             elif metric_name == "top_20_shareholders":
-                value = self._extract_shareholders_info(pdf_path, search_pages)
+                # This metric is handled differently - extract and save directly to ShareholderData table
+                shareholder_count = self._extract_and_save_shareholders_info(session, report_id, pdf_path, search_pages)
+                if shareholder_count > 0:
+                    metrics_count += 1 # Count as one 'metric' extracted for reporting purposes
+                continue # Skip the generic value saving logic below for shareholders
+            elif metric_name == "right_issues":
+                 # This metric is handled differently - extract details and save to notes
+                extracted_notes = self._extract_and_save_right_issues_info(session, report_id, metrics_db[metric_name].id, pdf_path, search_pages)
+                if extracted_notes: # If we found *any* info, count it
+                     metrics_count += 1
+                continue # Skip the generic value saving logic below for this metric
             else:
                 # First try extracting from tables
                 value = self._extract_from_tables(pdf_path, search_pages, metric_name)
@@ -383,16 +399,16 @@ class FinancialDataExtractor:
                         if value is not None:
                             break
             
-            # Use a fallback value of 0 if not found for specific metrics
-            if value is None and metric_name in ["right_issues", "top_20_shareholders"]:
-                value = 0
-                logger.info(f"Using fallback value 0 for {metric_name}")
-            
+            # Fallback logic removed for right_issues as it's handled above
+
+            # Save the extracted value for metrics other than shareholders and right issues
             if value is not None:
-                self._save_metric(session, report_id, metrics_db[metric_name].id, value, pdf_path)
-                metrics_count += 1
-                logger.info(f"Extracted {metric_name} with value {value}")
-            else:
+                 # Ensure we don't try to save shareholders or right issues here again
+                if metric_name not in ["top_20_shareholders", "right_issues"]:
+                    self._save_metric(session, report_id, metrics_db[metric_name].id, value, pdf_path)
+                    metrics_count += 1
+                    logger.info(f"Extracted {metric_name} with value {value}")
+            elif metric_name not in ["top_20_shareholders", "right_issues"]: # Don't warn for these handled metrics
                 logger.warning(f"Could not extract {metric_name}")
                 
         # Calculate gross profit margin
@@ -968,59 +984,251 @@ class FinancialDataExtractor:
         logger.warning("Could not extract operating expenses.")
         return None
 
-    def _extract_shareholders_info(self, pdf_path, pages_to_check):
-        """Extract information about top 20 shareholders."""
-        # Look for sections with shareholder information
-        shareholders_info = []
-        shareholder_pattern = self.metric_patterns.get("shareholder_row")
-        
-        # First, scan through pages to find those with shareholder information
+    def _extract_and_save_shareholders_info(self, session, report_id, pdf_path, pages_to_check):
+        """
+        Extracts Top 20 Shareholder data from tables using flexible parsing and saves it.
+        Returns the number of shareholders successfully saved.
+        """
+        shareholders_saved_count = 0
+        keywords = self.metric_keywords['top_20_shareholders']
+
+        for page in pages_to_check:
+            try:
+                tables = camelot.read_pdf(pdf_path, pages=str(page + 1), flavor='stream', edge_tol=500)
+
+                for table_idx, table in enumerate(tables):
+                    df = table.df
+                    table_str = df.to_string().lower()
+
+                    # Check if table seems relevant based on keywords
+                    if not any(keyword in table_str for keyword in keywords):
+                        continue # Skip table if keywords not found
+
+                    logger.info(f"Found potential shareholder table on page {page}, table index {table_idx}")
+
+                    # --- Flexible Column Identification ---
+                    rank_col, name_col, shares_col, percent_col = -1, -1, -1, -1
+                    header_row_idx = -1
+
+                    # 1. Try finding common headers in the first few rows
+                    for r_idx in range(min(3, len(df))): # Check first 3 rows for headers
+                        row_vals = [str(cell).lower().strip() for cell in df.iloc[r_idx]]
+                        possible_rank = [i for i, h in enumerate(row_vals) if h in ['#', 'rank', 'no.', 's/n']]
+                        possible_name = [i for i, h in enumerate(row_vals) if h in ['name', 'shareholder', 'investor']]
+                        possible_shares = [i for i, h in enumerate(row_vals) if 'shares' in h or 'shareholding' in h and '%' not in h]
+                        possible_percent = [i for i, h in enumerate(row_vals) if '%' in h or 'percentage' in h]
+
+                        # If we found plausible candidates for most columns, assume this is the header
+                        if len(possible_name) > 0 and len(possible_shares) > 0 and len(possible_percent) > 0:
+                            rank_col = possible_rank[0] if possible_rank else -1 # Rank is optional
+                            name_col = possible_name[0]
+                            shares_col = possible_shares[0]
+                            percent_col = possible_percent[0]
+                            header_row_idx = r_idx
+                            logger.info(f"Identified headers via text: Rank={rank_col}, Name={name_col}, Shares={shares_col}, Percent={percent_col} in row {header_row_idx}")
+                            break
+
+                    # 2. If headers not found, try guessing based on data types/patterns
+                    if header_row_idx == -1:
+                        logger.warning(f"Could not identify headers textually. Attempting heuristic identification.")
+                        potential_cols = {'rank': [], 'name': [], 'shares': [], 'percent': []}
+                        # Scan a few data rows to guess column types
+                        for r_idx in range(len(df)):
+                             # Skip potential header rows if they look non-numeric
+                            if r_idx < 3 and any(str(df.iloc[r_idx, c]).isalpha() for c in range(df.shape[1])):
+                                continue
+                            for c_idx in range(df.shape[1]):
+                                cell_val = str(df.iloc[r_idx, c_idx]).strip()
+                                # Rank: Small integer, often first column
+                                if c_idx <= 1 and cell_val.isdigit() and 1 <= int(cell_val) <= 50:
+                                    potential_cols['rank'].append(c_idx)
+                                # Name: Primarily text, not purely numeric
+                                elif not cell_val.replace(',', '').replace('.', '').isdigit() and len(cell_val) > 3:
+                                     potential_cols['name'].append(c_idx)
+                                # Shares: Large number, contains commas
+                                elif ',' in cell_val and cell_val.replace(',', '').isdigit():
+                                    potential_cols['shares'].append(c_idx)
+                                # Percent: Number between 0-100, might have '%' or '.'
+                                elif '%' in cell_val or (cell_val.replace('.', '', 1).isdigit() and 0 <= float(cell_val.replace('%','')) <= 100):
+                                     potential_cols['percent'].append(c_idx)
+
+                        # Find the most likely column index for each type
+                        from collections import Counter
+                        if potential_cols['rank']: rank_col = Counter(potential_cols['rank']).most_common(1)[0][0]
+                        if potential_cols['name']: name_col = Counter(potential_cols['name']).most_common(1)[0][0]
+                        if potential_cols['shares']: shares_col = Counter(potential_cols['shares']).most_common(1)[0][0]
+                        if potential_cols['percent']: percent_col = Counter(potential_cols['percent']).most_common(1)[0][0]
+                        header_row_idx = 0 # Assume data starts from the top if guessing
+                        logger.info(f"Identified headers heuristically: Rank={rank_col}, Name={name_col}, Shares={shares_col}, Percent={percent_col}")
+
+                    # Check if we have the essential columns
+                    if name_col == -1 or shares_col == -1 or percent_col == -1:
+                        logger.error(f"Failed to identify essential columns (Name, Shares, Percent) for table on page {page}. Skipping.")
+                        continue
+
+                    # --- Process Rows ---
+                    start_row = header_row_idx + 1 if header_row_idx != -1 else 0
+                    for i in range(start_row, len(df)):
+                        row_data = df.iloc[i]
+                        try:
+                            # Extract data using identified column indices
+                            rank_val = int(row_data.iloc[rank_col]) if rank_col != -1 else None
+                            name_val = str(row_data.iloc[name_col]).strip()
+                            shares_str = str(row_data.iloc[shares_col]).replace(',', '').strip()
+                            percent_str = str(row_data.iloc[percent_col]).replace('%', '').strip()
+
+                            # Basic validation and type conversion
+                            if not name_val or not shares_str or not percent_str:
+                                logger.debug(f"Skipping row {i} due to missing data: Rank={rank_val}, Name={name_val}, Shares={shares_str}, Percent={percent_str}")
+                                continue
+
+                            shares_val = int(shares_str) if shares_str else None
+                            percent_val = float(percent_str) if percent_str else None
+
+                            # Further validation (e.g., name shouldn't be purely numeric)
+                            if name_val.isdigit():
+                                logger.debug(f"Skipping row {i} as name '{name_val}' appears numeric.")
+                                continue
+
+                            # Save valid data
+                            if name_val and shares_val is not None and percent_val is not None:
+                                shareholder = ShareholderData(
+                                    report_id=report_id,
+                                    rank=rank_val,
+                                    shareholder_name=name_val,
+                                    number_of_shares=shares_val,
+                                    percentage_holding=percent_val
+                                )
+                                session.add(shareholder)
+                                shareholders_saved_count += 1
+                                # Commit periodically
+                                if shareholders_saved_count % 20 == 0:
+                                    session.commit()
+                                    logger.info(f"Committed batch of 20 shareholders. Total saved: {shareholders_saved_count}")
+
+
+                        except (IndexError, ValueError, TypeError) as row_err:
+                            logger.warning(f"Error processing row {i} in shareholder table on page {page}: {row_err}. Row data: {row_data.tolist()}")
+                            continue # Skip to next row
+
+                    # Break after processing the first relevant table found on the page (can be adjusted)
+                    if shareholders_saved_count > 0:
+                        logger.info(f"Finished processing shareholder table on page {page}. Found {shareholders_saved_count} entries.")
+                        break # Assume only one main shareholder table per page for now
+
+            except Exception as e:
+                logger.error(f"Error processing shareholder tables on page {page}: {e}")
+
+        # Final commit
+        if session.new:
+            session.commit()
+
+        if shareholders_saved_count == 0:
+             logger.warning(f"Could not extract any structured shareholder data for report {report_id} using flexible parsing.")
+
+        logger.info(f"Total shareholders saved for report {report_id}: {shareholders_saved_count}")
+        return shareholders_saved_count
+
+    def _extract_and_save_right_issues_info(self, session, report_id, metric_id, pdf_path, pages_to_check):
+        """
+        Extracts Right Issues details (ratio, price) using regex and saves to notes.
+        Returns the extracted notes string if successful, otherwise None.
+        """
+        keywords = self.metric_keywords['right_issues']
+        extracted_details = []
+
+        # Regex patterns to find ratio and price near keywords
+        # Ratio: Look for patterns like "X for Y", "X : Y", "one for every Y"
+        ratio_pattern = r'(?:ratio\s+of|basis\s+of)\s+(\d+)\s*(?:for|:)\s*every\s*(\d+)'
+        # Price: Look for patterns like "at LKR X", "price of Rs. Y", "subscription price Z"
+        price_pattern = r'(?:at|price\s+of|subscription\s+price)\s*(?:lkr|rs\.?)\s*([\d,]+\.?\d*)'
+
+        found_info = False
         for page in pages_to_check:
             try:
                 text = extract_text(pdf_path, page_numbers=[page])
-                text = text.lower()
-                
-                if any(keyword in text for keyword in self.metric_keywords['top_20_shareholders']):
-                    logger.info(f"Found potential shareholder info on page {page}")
-                    
-                    # Try to extract from tables first
-                    tables = camelot.read_pdf(pdf_path, pages=str(page+1), flavor='stream')
-                    
-                    for table in tables:
-                        table_str = table.df.to_string().lower()
-                        if any(keyword in table_str for keyword in self.metric_keywords['top_20_shareholders']):
-                            # This table likely contains shareholder info
-                            logger.info("Found shareholder table")
-                            
-                            # Process each row that may contain shareholder data
-                            for i, row in table.df.iterrows():
-                                row_str = ' '.join(str(cell) for cell in row).strip()
-                                # Look for rows that have a name and percentage
-                                if re.search(r'\d+\.\d+\s*%', row_str):
-                                    shareholders_info.append(row_str)
-                    
-                    # If we couldn't find in tables, try to extract from text using regex
-                    if not shareholders_info:
-                        lines = text.split('\n')
-                        for line in lines:
-                            match = re.search(shareholder_pattern, line)
-                            if match:
-                                shareholders_info.append(line)
-            
+                text_lower = text.lower()
+
+                # Check if page contains keywords
+                if any(keyword in text_lower for keyword in keywords):
+                    logger.info(f"Found potential 'Right Issues' keywords on page {page}")
+
+                    # Search for ratio and price within a context window around the keyword
+                    for keyword in keywords:
+                         for match in re.finditer(keyword, text_lower):
+                            start, end = match.span()
+                            context_window = text[max(0, start - 200):min(len(text), end + 200)] # Search 200 chars around keyword
+
+                            ratio_match = re.search(ratio_pattern, context_window, re.IGNORECASE)
+                            price_match = re.search(price_pattern, context_window, re.IGNORECASE)
+
+                            details = []
+                            if ratio_match:
+                                ratio_str = f"Ratio: {ratio_match.group(1)} for {ratio_match.group(2)}"
+                                details.append(ratio_str)
+                                logger.info(f"Extracted Right Issue Ratio: '{ratio_str}' on page {page}")
+                                found_info = True
+                            if price_match:
+                                price_str = f"Price: LKR {price_match.group(1)}"
+                                details.append(price_str)
+                                logger.info(f"Extracted Right Issue Price: '{price_str}' on page {page}")
+                                found_info = True
+
+                            if details:
+                                extracted_details.extend(details)
+
+                    # If we found info on this page, we might not need to check others
+                    # (Depends on how info is presented - could be multiple issues)
+                    # For now, let's continue searching all relevant pages
             except Exception as e:
-                logger.debug(f"Error extracting shareholder info from page {page}: {e}")
-        
-        # If we found shareholder information, store it
-        if shareholders_info:
-            logger.info(f"Found {len(shareholders_info)} shareholder entries")
-            
-            # For now, we'll just use 1 as a placeholder value
-            # In a real implementation, you'd store this in a structured format
-            # such as a separate database table for shareholders
-            return 1
-        
-        return None
-    
+                logger.error(f"Error processing page {page} for right issues: {e}")
+
+        # Combine unique findings and save
+        final_notes = None
+        if extracted_details:
+            # Remove duplicates while preserving order (if possible)
+            unique_details = []
+            seen = set()
+            for item in extracted_details:
+                if item not in seen:
+                    unique_details.append(item)
+                    seen.add(item)
+            final_notes = "; ".join(unique_details)
+            logger.info(f"Final extracted Right Issues notes for report {report_id}: {final_notes}")
+        else:
+            logger.warning(f"Could not extract specific Right Issues details for report {report_id}")
+            final_notes = "No specific details found." # Default note if nothing extracted
+
+        # Save to YearlyData (Value remains 0.0 or null, notes contain details)
+        try:
+            # Check if entry exists, update notes; otherwise create new
+            existing_entry = session.query(YearlyData).filter(
+                YearlyData.report_id == report_id,
+                YearlyData.metric_id == metric_id
+            ).first()
+
+            if existing_entry:
+                existing_entry.notes = final_notes
+                logger.info(f"Updating notes for existing Right Issues entry (Report ID: {report_id})")
+            else:
+                yearly_data = YearlyData(
+                    report_id=report_id,
+                    metric_id=metric_id,
+                    value=0.0, # Keep value as 0.0 as per original schema intent
+                    notes=final_notes
+                )
+                session.add(yearly_data)
+                logger.info(f"Creating new Right Issues entry with notes (Report ID: {report_id})")
+
+            session.commit()
+            return final_notes # Return the notes string if successful
+
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Error saving Right Issues notes for report {report_id}: {e}")
+            return None
+
+
     def _calculate_gross_profit_margin(self, session, report_id, metrics_db):
         """Calculate gross profit margin from revenue and cost of sales."""
         try:
@@ -1335,4 +1543,4 @@ def main():
         return 1
 
 if __name__ == "__main__":
-    sys.exit(main()) 
+    sys.exit(main())

@@ -2,9 +2,9 @@
 API endpoints for financial data analysis.
 """
 from flask import jsonify, request, make_response
-from . import api_bp
-from ..database import db
-from ..models.financial_data import FinancialMetric, YearlyData, FinancialReport
+from api import api_bp
+from database import db
+from models.financial_data import FinancialMetric, YearlyData, FinancialReport
 import numpy as np
 from scipy.stats import linregress
 import io

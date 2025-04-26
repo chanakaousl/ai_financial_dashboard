@@ -59,4 +59,23 @@ class YearlyData(Base):
     metric = relationship("FinancialMetric", back_populates="data_points")
     
     def __repr__(self):
-        return f"<YearlyData(report_id={self.report_id}, metric_id={self.metric_id}, value={self.value})>" 
+        return f"<YearlyData(report_id={self.report_id}, metric_id={self.metric_id}, value={self.value})>"
+
+class ShareholderData(Base):
+    """Model for storing detailed shareholder data."""
+    __tablename__ = 'shareholder_data'
+
+    id = Column(Integer, primary_key=True)
+    report_id = Column(Integer, ForeignKey('financial_reports.id'), nullable=False)
+    rank = Column(Integer)
+    shareholder_name = Column(String(255), nullable=False)
+    number_of_shares = Column(Integer) # Using Integer, adjust if shares can be fractional
+    percentage_holding = Column(Float)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    # Relationship back to FinancialReport (optional but good practice)
+    report = relationship("FinancialReport") # Add back_populates if needed later
+
+    def __repr__(self):
+        return f"<ShareholderData(report_id={self.report_id}, rank={self.rank}, name='{self.shareholder_name}', holding={self.percentage_holding}%)>"

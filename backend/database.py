@@ -1,8 +1,8 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
-from .models.financial_data import Base
+from models.financial_data import Base
 import logging
-from .config import get_config
+from config import get_config
 
 # Configure logger
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

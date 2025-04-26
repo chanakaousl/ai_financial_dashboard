@@ -2,9 +2,9 @@
 API endpoints for financial reports.
 """
 from flask import jsonify, request
-from . import api_bp
-from ..database import db
-from ..models.financial_data import FinancialReport
+from api import api_bp
+from database import db
+from models.financial_data import FinancialReport
 
 @api_bp.route('/health', methods=['GET'])
 def health_check():
