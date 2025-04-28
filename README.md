@@ -1,85 +1,119 @@
 # AI-Powered Financial Dashboard for John Keells Holdings
 
-An interactive AI-powered dashboard to visualize key financial metrics from John Keells Holdings PLC's annual reports (2019-2024).
-
-## Project Overview
-
-This application provides insightful visualizations and analysis of financial data extracted from John Keells Holdings' annual reports. The system uses AI/ML techniques to process PDF reports, extract key financial metrics, and present them in an interactive dashboard.
+An interactive AI-powered dashboard to visualize and analyze key financial metrics from John Keells Holdings PLC's annual reports (2020-2024). The dashboard provides dynamic analysis with user-friendly filters and enhanced insights.
 
 ## Features
 
-- PDF data extraction from financial reports
-- Interactive data visualizations
-- Financial trend analysis
-- Predictive analytics for future projections
-- Comparison of year-over-year performance
-- Custom filtering and data selection
+- **Total Revenue**: 5-year trend analysis with annotations for key events
+- **Cost of Sales vs. Operating Expenses**: Comparative analysis over 5 years
+- **Gross Profit Margin**: Trend visualization with annotations
+- **Earnings Per Share (EPS)**: 5-year curve with detailed tooltips
+- **Net Asset Per Share**: 5-year trend with industry benchmarks
+- **Top 20 Shareholders**: Interactive table/pie chart with year filters
 
 ## Tech Stack
 
-### Backend
-
-- **Python**: Processing and API server
-- **Flask**: Web framework
-- **Pandas/NumPy**: Data manipulation
-- **SQLite**: Database storage
-- **Camelot/PDFMiner**: PDF data extraction
-- **scikit-learn**: ML forecasting
-
-### Frontend
-
-- **React**: UI Framework
-- **Chart.js/D3.js**: Data visualization
-- **Tailwind CSS**: Styling
+- **Backend**: Python (Flask API, Pandas for data processing)
+- **Frontend**: React with TypeScript (Chart.js for visualizations)
+- **AI/ML**: Python (scikit-learn for forecasting)
+- **Data Extraction**: Camelot and PDFMiner for PDF parsing
+- **Database**: SQLite with SQLAlchemy ORM
 
 ## Project Structure
 
 ```
-ai_financial_dashboard/
-├── backend/              # Python Flask API
-│   ├── app.py            # Main application
-│   ├── models/           # Database models
-│   ├── utils/            # Utilities for PDF parsing, etc.
-│   └── requirements.txt  # Python dependencies
+/
+├── frontend/               # React frontend
+│   ├── src/                # Source code
+│   │   ├── components/     # Reusable components
+│   │   ├── views/          # Page components
+│   │   ├── api/            # API services
+│   │   ├── contexts/       # React contexts
+│   │   ├── hooks/          # Custom hooks
+│   │   └── types/          # TypeScript types
+│   └── public/             # Static assets
 │
-├── frontend/             # React frontend application
-│   ├── public/           # Static files
-│   ├── src/              # React source code
-│   └── package.json      # Node.js dependencies
+├── backend/                # Flask backend
+│   ├── api/                # API routes
+│   ├── models/             # Database models
+│   ├── pdf_parser.py       # PDF parsing utility
+│   └── database.py         # Database connection handling
 │
-└── data-pdf/             # PDF financial reports
+└── data-pdf/               # PDF financial reports
 ```
 
-## Setup Instructions
+## Getting Started
+
+### Prerequisites
+
+- Python 3.10+
+- Node.js 18+
+- PDF financial reports from John Keells Holdings
 
 ### Backend Setup
 
-1. Navigate to the backend directory
-2. Run the setup script:
-   - Windows: `setup_env.bat`
-   - Unix/Mac: `./setup_env.sh`
-3. Activate the virtual environment:
-   - Windows: `venv\Scripts\activate`
-   - Unix/Mac: `source venv/bin/activate`
-4. Start the Flask server: `python run.py`
+1. Navigate to the backend directory:
+
+   ```
+   cd backend
+   ```
+
+2. Create and activate a virtual environment:
+
+   ```
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. Install dependencies:
+
+   ```
+   pip install -r requirements.txt
+   ```
+
+4. Initialize the database:
+
+   ```
+   python init_db.py
+   ```
+
+5. Run the backend server:
+   ```
+   python run.py
+   ```
+
+The API will be available at http://localhost:5000/api
 
 ### Frontend Setup
 
-(Instructions will be added once frontend development is complete)
+1. Navigate to the frontend directory:
 
-## Development Roadmap
+   ```
+   cd frontend
+   ```
 
-1. ✅ Backend setup and environment configuration
-2. ⬜ PDF data extraction and processing
-3. ⬜ Database schema and data storage
-4. ⬜ API endpoint development
-5. ⬜ Frontend setup and component structure
-6. ⬜ Dashboard UI development
-7. ⬜ Data visualization implementation
-8. ⬜ AI/ML model integration
-9. ⬜ Testing and quality assurance
-10. ⬜ Deployment and documentation
+2. Install dependencies:
+
+   ```
+   npm install
+   ```
+
+3. Run the development server:
+   ```
+   npm run dev
+   ```
+
+The frontend will be available at http://localhost:5173
+
+## API Endpoints
+
+- `GET /api/health` - API health check
+- `GET /api/metrics` - Get all financial metrics
+- `GET /api/metrics/:id` - Get specific metric with yearly data
+- `GET /api/reports` - Get all financial reports
+- `GET /api/reports/:id` - Get specific report with metrics
+- `GET /api/shareholders` - Get top shareholders data
 
 ## License
 
-This project is proprietary and confidential.
+This project is licensed under the MIT License.

@@ -1,146 +1,155 @@
-import apiClient from './client';
+import axios from 'axios';
 
-// Types for the API responses
-export interface ApiResponse<T> {
+// Create axios instance with base URL
+const api = axios.create({
+  baseURL: 'http://localhost:5000/api',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Define API response types
+interface ApiResponse<T> {
   status: string;
   data: T;
+  message?: string;
 }
 
-export interface FinancialReport {
-  id: number;
-  year: number;
-  title: string;
-  file_path: string;
-  metrics?: MetricDataPoint[];
-}
-
-export interface FinancialMetric {
+interface Metric {
   id: number;
   name: string;
+  display_name: string;
   description: string;
   unit: string;
   category: string;
-  yearly_data?: YearlyDataPoint[];
+  visualization_type: string;
 }
 
-export interface YearlyDataPoint {
-  id: number;
+interface YearlyData {
   year: number;
   value: number;
-  notes?: string;
 }
 
-export interface MetricDataPoint {
+interface MetricWithData extends Metric {
+  yearly_data: YearlyData[];
+  annotations?: Record<string, any>;
+}
+
+interface Report {
   id: number;
-  metric_name: string;
-  value: number;
-  notes?: string;
+  year: number;
+  pdf_path: string;
 }
 
-export interface TrendAnalysis {
-  metric: {
+interface ReportWithMetrics extends Report {
+  metrics: {
     id: number;
     name: string;
+    display_name: string;
+    value: number;
     unit: string;
-    category: string;
-  };
-  yearly_data: YearlyDataPoint[];
-  analysis: {
-    trend_line?: {
-      slope: number;
-      intercept: number;
-      r_squared: number;
-      p_value: number;
-      std_err: number;
-    };
-    growth?: {
-      cagr: number;
-      total_change: number;
-    };
-    yoy_changes: {
-      year: number;
-      change: number;
-    }[];
-    anomalies: {
-      year: number;
-      value: number;
-      yoy_change: number;
-      deviation: number;
-      message: string;
-    }[];
-  };
+  }[];
 }
 
-export interface ShareholderData {
+interface ShareholderData {
+  id: number;
   year: number;
-  raw_value: string;
-  parsed_data?: string[];
-  parse_error?: string;
-  notes?: string;
+  rank: number;
+  name: string;
+  percentage: number;
+  shares: number;
 }
 
-// API Services
-export const apiServices = {
-  // Reports
-  getAllReports: async () => {
-    const response = await apiClient.get<ApiResponse<FinancialReport[]>>('/reports');
-    return response.data;
+interface ShareholdersResponse {
+  years: {
+    [key: string]: ShareholderData[];
+  };
+}
+
+// API service methods
+const apiServices = {
+  /**
+   * Check API health
+   */
+  checkApiHealth: async (): Promise<ApiResponse<{ message: string }>> => {
+    try {
+      const response = await api.get<ApiResponse<{ message: string }>>('/health');
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   },
 
-  getReportById: async (reportId: number) => {
-    const response = await apiClient.get<ApiResponse<FinancialReport>>(`/reports/${reportId}`);
-    return response.data;
+  /**
+   * Get all metrics
+   */
+  getAllMetrics: async (): Promise<ApiResponse<Metric[]>> => {
+    try {
+      const response = await api.get<ApiResponse<Metric[]>>('/metrics');
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   },
 
-  // Metrics
-  getAllMetrics: async () => {
-    const response = await apiClient.get<ApiResponse<FinancialMetric[]>>('/metrics');
-    return response.data;
+  /**
+   * Get a specific metric by ID with yearly data
+   */
+  getMetricById: async (id: number): Promise<ApiResponse<MetricWithData>> => {
+    try {
+      const response = await api.get<ApiResponse<MetricWithData>>(`/metrics/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   },
 
-  getMetricById: async (metricId: number) => {
-    const response = await apiClient.get<ApiResponse<FinancialMetric>>(`/metrics/${metricId}`);
-    return response.data;
+  /**
+   * Get all financial reports
+   */
+  getAllReports: async (): Promise<ApiResponse<Report[]>> => {
+    try {
+      const response = await api.get<ApiResponse<Report[]>>('/reports');
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   },
 
-  getMetricCategories: async () => {
-    const response = await apiClient.get<ApiResponse<string[]>>('/metrics/categories');
-    return response.data;
+  /**
+   * Get a specific report by ID with metric data
+   */
+  getReportById: async (id: number): Promise<ApiResponse<ReportWithMetrics>> => {
+    try {
+      const response = await api.get<ApiResponse<ReportWithMetrics>>(`/reports/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   },
 
-  // Analysis
-  getMetricTrend: async (metricId: number) => {
-    const response = await apiClient.get<ApiResponse<TrendAnalysis>>(`/analysis/trend/${metricId}`);
-    return response.data;
-  },
-
-  compareMetrics: async (metricIds: number[]) => {
-    const queryString = metricIds.map(id => `metric_ids=${id}`).join('&');
-    const response = await apiClient.get<ApiResponse<any>>(`/analysis/compare?${queryString}`);
-    return response.data;
-  },
-
-  // Shareholders
-  getShareholdersData: async () => {
-    const response = await apiClient.get<ApiResponse<{metric_name: string, metric_id: number, yearly_data: ShareholderData[]}>>('/shareholders');
-    return response.data;
-  },
-
-  // Utility endpoints
-  exportMetricCsv: (metricId: number) => {
-    window.open(`${apiClient.defaults.baseURL}/export/metric/${metricId}/csv`, '_blank');
-  },
-
-  exportCompareCsv: (metricIds: number[]) => {
-    const queryString = metricIds.map(id => `metric_ids=${id}`).join('&');
-    window.open(`${apiClient.defaults.baseURL}/export/compare/csv?${queryString}`, '_blank');
-  },
-
-  // Health check
-  checkApiHealth: async () => {
-    const response = await apiClient.get<ApiResponse<{message: string}>>('/health');
-    return response.data;
+  /**
+   * Get shareholders data
+   * @param year Optional year filter
+   */
+  getShareholders: async (year?: number): Promise<ApiResponse<ShareholdersResponse>> => {
+    try {
+      const url = year ? `/shareholders?year=${year}` : '/shareholders';
+      const response = await api.get<ApiResponse<ShareholdersResponse>>(url);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   }
 };
 
-export default apiServices; 
+export default apiServices;
+export type { 
+  Metric, 
+  YearlyData, 
+  MetricWithData, 
+  Report, 
+  ReportWithMetrics, 
+  ShareholderData, 
+  ShareholdersResponse 
+}; 

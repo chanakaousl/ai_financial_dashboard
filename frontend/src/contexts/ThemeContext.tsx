@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 type Theme = 'light' | 'dark';
 
@@ -7,50 +7,55 @@ interface ThemeContextType {
   toggleTheme: () => void;
 }
 
-// Create context with default values
-export const ThemeContext = createContext<ThemeContextType>({
-  theme: 'light',
-  toggleTheme: () => {},
-});
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+
+export const useTheme = (): ThemeContextType => {
+  const context = useContext(ThemeContext);
+  if (!context) {
+    throw new Error('useTheme must be used within a ThemeProvider');
+  }
+  return context;
+};
 
 interface ThemeProviderProps {
   children: ReactNode;
 }
 
 export const ThemeProvider = ({ children }: ThemeProviderProps) => {
-  // Get theme from localStorage or default to system preference
+  // Check if user has already set preference in localStorage
+  // Or if system prefers dark mode
   const getInitialTheme = (): Theme => {
-    // Check if theme was saved in localStorage
-    const savedTheme = localStorage.getItem('theme') as Theme | null;
-    if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark')) {
+    const savedTheme = localStorage.getItem('jkh-theme') as Theme | null;
+    
+    if (savedTheme) {
       return savedTheme;
     }
-
-    // Check for system preference
+    
+    // Check system preference
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
       return 'dark';
     }
-
-    // Default to light
+    
     return 'light';
   };
 
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
 
-  // Toggle theme function
-  const toggleTheme = () => {
-    setTheme((prevTheme) => (prevTheme === 'light' ? 'dark' : 'light'));
-  };
-
-  // Update localStorage and document class when theme changes
+  // Apply theme class to document element
   useEffect(() => {
-    localStorage.setItem('theme', theme);
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
     
-    // Update the HTML document class for CSS styling
-    const root = window.document.documentElement;
-    root.classList.remove('light', 'dark');
-    root.classList.add(theme);
+    // Save to localStorage
+    localStorage.setItem('jkh-theme', theme);
   }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
+  };
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>

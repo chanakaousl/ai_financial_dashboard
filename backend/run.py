@@ -4,6 +4,10 @@ Entry point for the JKH Financial Dashboard Flask application.
 """
 import os
 from app import app
+from flask_cors import CORS
+
+# Enable CORS for all routes
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
