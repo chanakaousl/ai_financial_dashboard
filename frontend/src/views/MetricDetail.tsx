@@ -5,8 +5,8 @@ import LineChart from '../components/LineChart';
 import DashboardCard from '../components/DashboardCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
-import { FinancialMetric, TrendAnalysis } from '../api/services';
-import { DocumentArrowDownIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { MetricWithData } from '../api/services';
+import { ArrowPathIcon } from '@heroicons/react/24/outline';
 
 const MetricDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -14,24 +14,22 @@ const MetricDetail = () => {
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [metric, setMetric] = useState<FinancialMetric | null>(null);
-  const [trendAnalysis, setTrendAnalysis] = useState<TrendAnalysis | null>(null);
+  const [metric, setMetric] = useState<MetricWithData | null>(null);
 
   useEffect(() => {
     const fetchMetricData = async () => {
       setLoading(true);
       setError(null);
       try {
-        // Fetch metric details
-        const metricResponse = await apiServices.getMetricById(metricId);
-        setMetric(metricResponse.data);
-        
-        // Fetch trend analysis
-        const trendResponse = await apiServices.getMetricTrend(metricId);
-        setTrendAnalysis(trendResponse.data);
+        const response = await apiServices.getMetricById(metricId);
+        if (response.status === 'success') {
+          setMetric(response.data);
+        } else {
+          setError('Failed to load metric data');
+        }
       } catch (err) {
-        setError(`Failed to load metric details. Please try again.`);
-        console.error(err);
+        console.error('Error fetching metric:', err);
+        setError('Failed to load metric details. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -46,20 +44,16 @@ const MetricDetail = () => {
   }, [metricId]);
 
   const formatValue = (value: number) => {
-    if (metric?.unit === '%') {
+    if (!metric) return value.toString();
+    
+    if (metric.unit === '%') {
       return `${value.toFixed(2)}%`;
-    } else if (metric?.unit === 'LKR') {
+    } else if (metric.unit === 'LKR') {
       return `LKR ${value.toLocaleString()}`;
-    } else if (metric?.unit === 'LKR/share') {
+    } else if (metric.unit === 'LKR/share') {
       return `LKR ${value.toLocaleString()} per share`;
     } else {
       return value.toLocaleString();
-    }
-  };
-
-  const handleExportCsv = () => {
-    if (metricId) {
-      apiServices.exportMetricCsv(metricId);
     }
   };
 
@@ -67,24 +61,34 @@ const MetricDetail = () => {
   if (error) return <ErrorMessage message={error} onRetry={() => window.location.reload()} />;
   if (!metric) return <ErrorMessage message="Metric not found" />;
 
+  // Sort yearly data by year in descending order
+  const sortedYearlyData = [...(metric.yearly_data || [])].sort((a, b) => b.year - a.year);
+  const latestYear = sortedYearlyData[0]?.year;
+  const previousYear = sortedYearlyData[1]?.year;
+  const latestValue = sortedYearlyData[0]?.value;
+  const previousValue = sortedYearlyData[1]?.value;
+
+  // Calculate year-over-year change
+  const yearOverYearChange = latestValue && previousValue 
+    ? ((latestValue - previousValue) / previousValue) * 100 
+    : null;
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold">{metric.name}</h1>
-          <p className="text-gray-600">{metric.description}</p>
+          <h1 className="text-2xl font-bold mb-2">{metric.name}</h1>
+          <p className="text-gray-600 dark:text-gray-400">{metric.description}</p>
+          {metric.category && (
+            <span className="inline-block mt-2 px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-sm">
+              {metric.category}
+            </span>
+          )}
         </div>
         <div className="flex space-x-2">
-          <button
-            onClick={handleExportCsv}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            <DocumentArrowDownIcon className="h-5 w-5 mr-2" />
-            Export CSV
-          </button>
           <Link
             to="/compare"
-            className="flex items-center px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+            className="flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
           >
             <ArrowPathIcon className="h-5 w-5 mr-2" />
             Compare with others
@@ -92,17 +96,40 @@ const MetricDetail = () => {
         </div>
       </div>
 
+      {latestValue && previousValue && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          <DashboardCard title="Latest Value">
+            <div className="text-3xl font-bold mb-2">{formatValue(latestValue)}</div>
+            <div className="text-sm text-gray-500">Year {latestYear}</div>
+          </DashboardCard>
+
+          <DashboardCard title="Previous Value">
+            <div className="text-2xl font-bold mb-2">{formatValue(previousValue)}</div>
+            <div className="text-sm text-gray-500">Year {previousYear}</div>
+          </DashboardCard>
+
+          {yearOverYearChange !== null && (
+            <DashboardCard title="Year-over-Year Change">
+              <div className={`text-2xl font-bold mb-2 ${yearOverYearChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {yearOverYearChange >= 0 ? '+' : ''}{yearOverYearChange.toFixed(2)}%
+              </div>
+              <div className="text-sm text-gray-500">From {previousYear} to {latestYear}</div>
+            </DashboardCard>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-6 mb-8">
-        {/* Main Trend Chart */}
-        <DashboardCard title={`${metric.name} Trend (5-Year)`}>
+        {/* Trend Chart */}
+        <DashboardCard title={`${metric.name} Historical Trend`}>
           {metric.yearly_data && metric.yearly_data.length > 0 ? (
             <LineChart
               title=""
-              labels={metric.yearly_data.map((d) => d.year)}
+              labels={metric.yearly_data.map(d => d.year)}
               datasets={[
                 {
                   label: metric.name,
-                  data: metric.yearly_data.map((d) => d.value),
+                  data: metric.yearly_data.map(d => d.value),
                   borderColor: 'rgb(53, 162, 235)',
                   backgroundColor: 'rgba(53, 162, 235, 0.5)',
                 }
@@ -114,122 +141,58 @@ const MetricDetail = () => {
             <div className="py-6 text-center text-gray-500">No data available</div>
           )}
         </DashboardCard>
-      </div>
 
-      {trendAnalysis && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Growth Stats */}
-          <DashboardCard title="Growth Analysis">
-            <div className="space-y-4">
-              {trendAnalysis.analysis.growth && (
-                <>
-                  <div>
-                    <span className="block text-sm text-gray-500">Compound Annual Growth Rate</span>
-                    <span className={`text-xl font-semibold ${trendAnalysis.analysis.growth.cagr >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {(trendAnalysis.analysis.growth.cagr * 100).toFixed(2)}%
-                    </span>
-                  </div>
-                  <div>
-                    <span className="block text-sm text-gray-500">Total Change</span>
-                    <span className={`text-xl font-semibold ${trendAnalysis.analysis.growth.total_change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {(trendAnalysis.analysis.growth.total_change * 100).toFixed(2)}%
-                    </span>
-                  </div>
-                </>
-              )}
-              
-              {trendAnalysis.analysis.trend_line && (
-                <div>
-                  <span className="block text-sm text-gray-500">Trend Strength (R²)</span>
-                  <span className="text-xl font-semibold">
-                    {trendAnalysis.analysis.trend_line.r_squared.toFixed(2)}
-                  </span>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {trendAnalysis.analysis.trend_line.r_squared > 0.7 
-                      ? 'Strong trend'
-                      : trendAnalysis.analysis.trend_line.r_squared > 0.3
-                      ? 'Moderate trend'
-                      : 'Weak trend'
-                    }
-                  </p>
-                </div>
-              )}
-            </div>
-          </DashboardCard>
-          
-          {/* YoY Changes */}
-          <DashboardCard title="Year-over-Year Changes">
-            {trendAnalysis.analysis.yoy_changes && trendAnalysis.analysis.yoy_changes.length > 0 ? (
-              <div className="space-y-3">
-                {trendAnalysis.analysis.yoy_changes.map((change) => (
-                  <div key={change.year} className="flex justify-between items-center">
-                    <span className="font-medium">{change.year}</span>
-                    <span className={`font-semibold ${change.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {(change.change * 100).toFixed(2)}%
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="py-6 text-center text-gray-500">No YoY data available</div>
-            )}
-          </DashboardCard>
-          
-          {/* Anomalies */}
-          <DashboardCard title="Anomalies & Events">
-            {trendAnalysis.analysis.anomalies && trendAnalysis.analysis.anomalies.length > 0 ? (
-              <div className="space-y-4">
-                {trendAnalysis.analysis.anomalies.map((anomaly, index) => (
-                  <div key={index} className="border-l-4 border-yellow-500 pl-3 py-1">
-                    <div className="font-medium">Year {anomaly.year}</div>
-                    <div className="text-sm text-gray-600">{anomaly.message}</div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      Value: {formatValue(anomaly.value)}, Change: {(anomaly.yoy_change * 100).toFixed(2)}%
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="py-6 text-center text-gray-500">No anomalies detected</div>
-            )}
-          </DashboardCard>
-        </div>
-      )}
-      
-      {/* Data Table */}
-      <DashboardCard title="Historical Data">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Year</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {metric.yearly_data && metric.yearly_data.length > 0 ? (
-                metric.yearly_data
-                  .slice() // Create a copy
-                  .sort((a, b) => b.year - a.year) // Sort by descending year
-                  .map((data) => (
-                    <tr key={data.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{data.year}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatValue(data.value)}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{data.notes || '-'}</td>
-                    </tr>
-                  ))
-              ) : (
+        {/* Data Table */}
+        <DashboardCard title="Historical Data">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-800">
                 <tr>
-                  <td colSpan={3} className="px-6 py-4 text-center text-sm text-gray-500">No data available</td>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Year
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Value
+                  </th>
+                  {yearOverYearChange !== null && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      YoY Change
+                    </th>
+                  )}
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </DashboardCard>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                {sortedYearlyData.map((data, index) => {
+                  const nextValue = sortedYearlyData[index + 1]?.value;
+                  const yoyChange = nextValue ? ((data.value - nextValue) / nextValue) * 100 : null;
+                  
+                  return (
+                    <tr key={data.year} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                        {data.year}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {formatValue(data.value)}
+                      </td>
+                      {yearOverYearChange !== null && (
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {yoyChange !== null ? (
+                            <span className={yoyChange >= 0 ? 'text-green-600' : 'text-red-600'}>
+                              {yoyChange >= 0 ? '+' : ''}{yoyChange.toFixed(2)}%
+                            </span>
+                          ) : '-'}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </DashboardCard>
+      </div>
     </div>
   );
 };
 
-export default MetricDetail; 
+export default MetricDetail;

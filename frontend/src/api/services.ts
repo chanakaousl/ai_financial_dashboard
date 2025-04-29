@@ -1,12 +1,4 @@
-import axios from 'axios';
-
-// Create axios instance with base URL
-const api = axios.create({
-  baseURL: 'http://localhost:5000/api',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+import apiClient from './client';
 
 // Define API response types
 interface ApiResponse<T> {
@@ -18,11 +10,9 @@ interface ApiResponse<T> {
 interface Metric {
   id: number;
   name: string;
-  display_name: string;
   description: string;
   unit: string;
   category: string;
-  visualization_type: string;
 }
 
 interface YearlyData {
@@ -32,7 +22,6 @@ interface YearlyData {
 
 interface MetricWithData extends Metric {
   yearly_data: YearlyData[];
-  annotations?: Record<string, any>;
 }
 
 interface Report {
@@ -73,7 +62,7 @@ const apiServices = {
    */
   checkApiHealth: async (): Promise<ApiResponse<{ message: string }>> => {
     try {
-      const response = await api.get<ApiResponse<{ message: string }>>('/health');
+      const response = await apiClient.get<ApiResponse<{ message: string }>>('/health');
       return response.data;
     } catch (error) {
       throw error;
@@ -85,7 +74,7 @@ const apiServices = {
    */
   getAllMetrics: async (): Promise<ApiResponse<Metric[]>> => {
     try {
-      const response = await api.get<ApiResponse<Metric[]>>('/metrics');
+      const response = await apiClient.get<ApiResponse<Metric[]>>('/metrics');
       return response.data;
     } catch (error) {
       throw error;
@@ -97,7 +86,7 @@ const apiServices = {
    */
   getMetricById: async (id: number): Promise<ApiResponse<MetricWithData>> => {
     try {
-      const response = await api.get<ApiResponse<MetricWithData>>(`/metrics/${id}`);
+      const response = await apiClient.get<ApiResponse<MetricWithData>>(`/metrics/${id}`);
       return response.data;
     } catch (error) {
       throw error;
@@ -109,7 +98,7 @@ const apiServices = {
    */
   getAllReports: async (): Promise<ApiResponse<Report[]>> => {
     try {
-      const response = await api.get<ApiResponse<Report[]>>('/reports');
+      const response = await apiClient.get<ApiResponse<Report[]>>('/reports');
       return response.data;
     } catch (error) {
       throw error;
@@ -121,7 +110,7 @@ const apiServices = {
    */
   getReportById: async (id: number): Promise<ApiResponse<ReportWithMetrics>> => {
     try {
-      const response = await api.get<ApiResponse<ReportWithMetrics>>(`/reports/${id}`);
+      const response = await apiClient.get<ApiResponse<ReportWithMetrics>>(`/reports/${id}`);
       return response.data;
     } catch (error) {
       throw error;
@@ -135,7 +124,7 @@ const apiServices = {
   getShareholders: async (year?: number): Promise<ApiResponse<ShareholdersResponse>> => {
     try {
       const url = year ? `/shareholders?year=${year}` : '/shareholders';
-      const response = await api.get<ApiResponse<ShareholdersResponse>>(url);
+      const response = await apiClient.get<ApiResponse<ShareholdersResponse>>(url);
       return response.data;
     } catch (error) {
       throw error;
@@ -152,4 +141,4 @@ export type {
   ReportWithMetrics, 
   ShareholderData, 
   ShareholdersResponse 
-}; 
+};

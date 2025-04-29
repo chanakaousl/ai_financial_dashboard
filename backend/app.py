@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, redirect, url_for
 from dotenv import load_dotenv
 import os
 from database import db
@@ -8,15 +8,6 @@ from api import api_bp
 load_dotenv()
 
 def create_app(config_name='development'):
-    """
-    Create and configure the Flask application.
-    
-    Args:
-        config_name: Configuration environment name
-        
-    Returns:
-        Flask application instance
-    """
     app = Flask(__name__)
     
     # Load configuration
@@ -33,11 +24,17 @@ def create_app(config_name='development'):
     # Register blueprints
     app.register_blueprint(api_bp)
     
+    # Add root route
+    @app.route('/')
+    def index():
+        return redirect(url_for('api.health_check'))
+    
     return app
 
 # Create the Flask application
 app = create_app(os.environ.get('FLASK_ENV', 'development'))
 
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True) 
+    app.run(host='0.0.0.0', port=port, debug=True)

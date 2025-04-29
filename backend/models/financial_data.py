@@ -27,12 +27,10 @@ class FinancialMetric(Base):
     
     id = Column(Integer, primary_key=True)
     name = Column(String(50), unique=True, nullable=False)
-    display_name = Column(String(100), nullable=False)
     description = Column(Text)
     unit = Column(String(20), default="LKR")
     category = Column(String(50))
-    visualization_type = Column(String(50), default="line")  # line, bar, pie
-    annotations = Column(JSON)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
     
     # Relationships
     yearly_data = relationship("YearlyData", back_populates="metric")

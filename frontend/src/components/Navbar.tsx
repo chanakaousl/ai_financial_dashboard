@@ -2,14 +2,14 @@ import { Link, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import { Bars3Icon, XMarkIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import ThemeToggle from './ThemeToggle';
-import { useTheme } from '../hooks/useTheme';
+import { useTheme } from '../contexts/ThemeContext';
 
 /**
  * Modern responsive navbar with theme toggle and active link highlighting
  */
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const { theme } = useTheme();
+  useTheme(); // Call useTheme to ensure it's used within a provider, but don't destructure theme if unused
   const location = useLocation();
 
   // Navigation links configuration
@@ -111,4 +111,4 @@ const Navbar = () => {
   );
 };
 
-export default Navbar; 
+export default Navbar;

@@ -1,4 +1,4 @@
-import { useTheme } from '../hooks/useTheme';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface LoadingSpinnerProps {
   size?: 'sm' | 'md' | 'lg';
@@ -45,4 +45,4 @@ const LoadingSpinner = ({
   );
 };
 
-export default LoadingSpinner; 
+export default LoadingSpinner;

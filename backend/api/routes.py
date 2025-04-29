@@ -3,6 +3,7 @@ from database import db
 from models.financial_data import FinancialMetric, YearlyData, FinancialReport, ShareholderData
 from sqlalchemy import desc
 from . import api_bp
+import traceback # Import traceback module
 
 @api_bp.route('/health', methods=['GET'])
 def health_check():
@@ -21,15 +22,14 @@ def get_all_metrics():
             result.append({
                 "id": metric.id,
                 "name": metric.name,
-                "display_name": metric.display_name,
                 "description": metric.description,
                 "unit": metric.unit,
-                "category": metric.category,
-                "visualization_type": metric.visualization_type
+                "category": metric.category
             })
         
         return jsonify({"status": "success", "data": result})
     except Exception as e:
+        traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 500
     finally:
         db.close_session(session)
@@ -60,17 +60,15 @@ def get_metric_by_id(metric_id):
         result = {
             "id": metric.id,
             "name": metric.name,
-            "display_name": metric.display_name,
             "description": metric.description,
             "unit": metric.unit,
             "category": metric.category,
-            "visualization_type": metric.visualization_type,
-            "annotations": metric.annotations,
             "yearly_data": yearly_data
         }
         
         return jsonify({"status": "success", "data": result})
     except Exception as e:
+        traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 500
     finally:
         db.close_session(session)
@@ -92,6 +90,7 @@ def get_all_reports():
         
         return jsonify({"status": "success", "data": result})
     except Exception as e:
+        traceback.print_exc() # Print the full traceback
         return jsonify({"status": "error", "message": str(e)}), 500
     finally:
         db.close_session(session)
@@ -113,7 +112,6 @@ def get_report_by_id(report_id):
             metrics_data.append({
                 "id": metric.id,
                 "name": metric.name,
-                "display_name": metric.display_name,
                 "value": data.value,
                 "unit": metric.unit
             })
@@ -127,6 +125,7 @@ def get_report_by_id(report_id):
         
         return jsonify({"status": "success", "data": result})
     except Exception as e:
+        traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 500
     finally:
         db.close_session(session)
@@ -172,6 +171,7 @@ def get_shareholders():
         
         return jsonify({"status": "success", "data": result})
     except Exception as e:
+        traceback.print_exc() # Print the full traceback
         return jsonify({"status": "error", "message": str(e)}), 500
     finally:
-        db.close_session(session) 
+        db.close_session(session)
