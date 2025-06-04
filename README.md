@@ -1,4 +1,4 @@
-# AI-Powered Financial Dashboard for John Keells Holdings
+# AI-Powered Financial Dashboard 
 
 An interactive AI-powered dashboard to visualize and analyze key financial metrics from John Keells Holdings PLC's annual reports (2020-2024). The dashboard provides dynamic analysis with user-friendly filters and enhanced insights.
 
